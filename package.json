@@ -1,0 +1,12 @@
+{
+  "name": "amvgg-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "scraper.js",
+  "scripts": {
+    "start": "node scraper.js"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0"
+  }
+}
