@@ -1,0 +1,35 @@
+name: Auto Scrape AMVGG
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Uruchamia się codziennie o godzinie 6:00 rano UTC
+  workflow_dispatch: # Pozwala też włączyć skrypt ręcznie jednym przyciskiem w każdej chwili
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repozytorium
+        uses: actions/checkout@v4
+
+      - name: Instalacja Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalacja zależności
+        run: npm install
+
+      - name: Instalacja przeglądarki Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Uruchomienie skryptu
+        run: npm start
+
+      - name: Automatyczny zapis zmian w pliku pets.json
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git add pets.json
+          git commit -m "Automatyczna aktualizacje cen petów [skip ci]" || exit 0
+          git push
