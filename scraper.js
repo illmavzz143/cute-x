@@ -18,10 +18,13 @@ async function scrapePets() {
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
     let allPets = {};
+    let previousHeight = 0;
+    let sameHeightCount = 0;
 
-    // Przewijamy i zbieramy dane na bieżąco w każdym kroku, żeby nie stracić uciekających elementów z DOM
-    console.log("Przewijanie i zbieranie zwierzaków...");
-    for (let i = 0; i < 50; i++) {
+    console.log("Przewijanie i zbieranie wszystkich zwierzaków do końca strony...");
+    
+    // Robimy pętle dopóki strona się przewija (maksymalnie 80 kroków)
+    for (let i = 0; i < 80; i++) {
       const currentBatch = await page.evaluate(() => {
         let data = {};
         const cards = document.querySelectorAll('div');
@@ -45,12 +48,26 @@ async function scrapePets() {
         return data;
       });
 
-      // Łączymy nowe wyniki z ogólną pulą
       Object.assign(allPets, currentBatch);
       
-      // Przewijamy niżej
+      // Sprawdzamy wysokość strony przed i po przewinięciu
+      let currentHeight = await page.evaluate(() => document.body.scrollHeight);
       await page.evaluate(() => window.scrollBy(0, 800));
       await page.waitForTimeout(600);
+      
+      let newHeight = await page.evaluate(() => document.body.scrollHeight);
+      
+      // Jeśli wysokość się nie zmieniła przez kilka kroków, to znaczy, że jesteśmy na samym dole
+      if (newHeight === previousHeight) {
+        sameHeightCount++;
+        if (sameHeightCount >= 3) {
+          console.log("Osiągnięto koniec strony.");
+          break;
+        }
+      } else {
+        sameHeightCount = 0;
+      }
+      previousHeight = newHeight;
     }
 
     console.log(`Łącznie znaleziono unikalnych petów: ${Object.keys(allPets).length}`);
