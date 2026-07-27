@@ -18,13 +18,13 @@ async function scrapePets() {
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
     let allPets = {};
-    let previousHeight = 0;
-    let sameHeightCount = 0;
+    let previousCount = 0;
+    let attemptsWithoutChange = 0;
 
-    console.log("Przewijanie i zbieranie wszystkich zwierzaków do końca strony...");
-    
-    // Robimy pętle dopóki strona się przewija (maksymalnie 80 kroków)
-    for (let i = 0; i < 80; i++) {
+    console.log("Zbieranie zwierzaków i przewijanie do absolutnego końca...");
+
+    // Pętla będzie trwać tak długo, aż przestaną pojawiać się nowe zwierzaki
+    while (attemptsWithoutChange < 10) {
       const currentBatch = await page.evaluate(() => {
         let data = {};
         const cards = document.querySelectorAll('div');
@@ -49,28 +49,24 @@ async function scrapePets() {
       });
 
       Object.assign(allPets, currentBatch);
-      
-      // Sprawdzamy wysokość strony przed i po przewinięciu
-      let currentHeight = await page.evaluate(() => document.body.scrollHeight);
-      await page.evaluate(() => window.scrollBy(0, 800));
-      await page.waitForTimeout(600);
-      
-      let newHeight = await page.evaluate(() => document.body.scrollHeight);
-      
-      // Jeśli wysokość się nie zmieniła przez kilka kroków, to znaczy, że jesteśmy na samym dole
-      if (newHeight === previousHeight) {
-        sameHeightCount++;
-        if (sameHeightCount >= 3) {
-          console.log("Osiągnięto koniec strony.");
-          break;
-        }
+      let currentCount = Object.keys(allPets).length;
+
+      // Sprawdzamy, czy przybyły nowe zwierzaki
+      if (currentCount === previousCount) {
+        attemptsWithoutChange++;
       } else {
-        sameHeightCount = 0;
+        attemptsWithoutChange = 0; // resetujemy, bo wciąż ładują się nowe
+        previousCount = currentCount;
       }
-      previousHeight = newHeight;
+
+      console.log(`Aktualnie zebrano unikalnych petów: ${currentCount}`);
+
+      // Przewijamy niżej i dajemos stronie czas na dorenderowanie kolejnej partii
+      await page.evaluate(() => window.scrollBy(0, 1000));
+      await page.waitForTimeout(1000);
     }
 
-    console.log(`Łącznie znaleziono unikalnych petów: ${Object.keys(allPets).length}`);
+    console.log(`Zakończono! Łącznie znaleziono unikalnych petów: ${Object.keys(allPets).length}`);
 
     fs.writeFileSync('pets.json', JSON.stringify(allPets, null, 2));
     console.log("Zapisano pomyślnie do pets.json!");
