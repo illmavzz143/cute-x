@@ -14,32 +14,53 @@ async function scrapePets() {
     console.log("Wchodzenie na stronę amvgg...");
     await page.goto('https://amvgg.com/values/pets', { waitUntil: 'domcontentloaded', timeout: 60000 });
     
-    // Dajemy stronie chwilę na wyrenderowanie elementów przez JS
-    console.log("Czekanie na załadowanie elementów...");
-    await page.waitForTimeout(5000);
+    console.log("Czekanie na załadowanie kart...");
+    // Czekamy aż pojawią się nagłówki z nazwami petów
+    await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
+
+    // Przewijamy stronę do dołu, żeby załadować wszystkie elementy (infinite scroll / lazy load)
+    console.log("Przewijanie strony, aby załadować wszystkie zwierzaki...");
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        let distance = 500;
+        let timer = setInterval(() => {
+          let scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= scrollHeight - window.innerHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
+    });
+
+    await page.waitForTimeout(2000);
 
     console.log("Wyciąganie danych o petach...");
     const petsData = await page.evaluate(() => {
       let data = {};
       
-      // Szukamy wszystkich elementów mogących zawierać karty zwierzaków (np. divy z linkami lub nagłówkami)
-      const elements = document.querySelectorAll('a, div');
+      // Szukamy wszystkich kart zwierzaków na stronie
+      // Karta zazwyczaj zawiera tag h2 z nazwą
+      const cards = document.querySelectorAll('div');
       
-      elements.forEach(el => {
-        let text = el.innerText ? el.innerText.trim() : '';
-        // Szukamy linijek, które wyglądają jak nazwa i cena
-        if (text && text.length < 100 && text.includes('\n')) {
-          let lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-          if (lines.length >= 2) {
-            let name = lines[0];
-            let potentialPrice = lines[1];
-            // Proste sprawdzenie czy druga linia ma cyfry (cenę)
-            let match = potentialPrice.match(/[\d,.]+/);
-            if (match && name.length > 2 && !data[name]) {
-              let price = parseFloat(match[0].replace(/,/g, ''));
-              if (!isNaN(price)) {
-                data[name] = price;
-              }
+      cards.forEach(card => {
+        const h2 = card.querySelector('h2.font-bold');
+        if (h2) {
+          let name = h2.innerText.trim();
+          let cardText = card.innerText;
+          
+          // Szukamy wartości (Value) w tekście karty
+          // Tekst zazwyczaj zawiera sekcję z wartością
+          let match = cardText.match(/Value\s*([\d,.]+)/i);
+          if (match) {
+            let priceStr = match[1].replace(/,/g, '');
+            let price = parseFloat(priceStr);
+            if (!isNaN(price) && name) {
+              data[name] = price;
             }
           }
         }
