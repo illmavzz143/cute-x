@@ -17,11 +17,11 @@ async function scrapePets() {
     console.log("Czekanie na załadowanie kart...");
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
-    // Agresywne przewijanie w dół kilkanaście razy, żeby zmusić stronę do załadowania wszystkiego
+    // Zwiększamy liczbę przewinięć, żeby strona załadowała wszystkich 700+ petów
     console.log("Przewijanie strony, aby załadować wszystkie zwierzaki...");
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 40; i++) {
       await page.evaluate(() => window.scrollBy(0, 1000));
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(800);
     }
 
     console.log("Wyciąganie danych o petach...");
