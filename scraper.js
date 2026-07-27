@@ -12,24 +12,39 @@ async function scrapePets() {
   
   try {
     console.log("Wchodzenie na stronę amvgg...");
-    await page.goto('https://amvgg.com/values/pets', { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto('https://amvgg.com/values/pets', { waitUntil: 'domcontentloaded', timeout: 60000 });
     
-    // Krótkie upewnienie się, że elementy się załadowały
-    await page.waitForSelector('a[href*="/pet/"]', { timeout: 15000 }).catch(() => {});
+    // Dajemy stronie chwilę na wyrenderowanie elementów przez JS
+    console.log("Czekanie na załadowanie elementów...");
+    await page.waitForTimeout(5000);
 
     console.log("Wyciąganie danych o petach...");
     const petsData = await page.evaluate(() => {
       let data = {};
-      document.querySelectorAll('a[href*="/pet/"]').forEach(el => {
-        let name = el.getAttribute('href').split('/').pop().replace(/_/g, ' ').replace(/-/g, ' ');
-        name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        let text = el.innerText || '';
-        let match = text.match(/[\d,.]+/);
-        if (match) {
-          let price = parseFloat(match[0].replace(/,/g, ''));
-          if (!isNaN(price)) data[name] = price;
+      
+      // Szukamy wszystkich elementów mogących zawierać karty zwierzaków (np. divy z linkami lub nagłówkami)
+      const elements = document.querySelectorAll('a, div');
+      
+      elements.forEach(el => {
+        let text = el.innerText ? el.innerText.trim() : '';
+        // Szukamy linijek, które wyglądają jak nazwa i cena
+        if (text && text.length < 100 && text.includes('\n')) {
+          let lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          if (lines.length >= 2) {
+            let name = lines[0];
+            let potentialPrice = lines[1];
+            // Proste sprawdzenie czy druga linia ma cyfry (cenę)
+            let match = potentialPrice.match(/[\d,.]+/);
+            if (match && name.length > 2 && !data[name]) {
+              let price = parseFloat(match[0].replace(/,/g, ''));
+              if (!isNaN(price)) {
+                data[name] = price;
+              }
+            }
+          }
         }
       });
+      
       return data;
     });
 
