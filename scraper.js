@@ -17,41 +17,45 @@ async function scrapePets() {
     console.log("Czekanie na załadowanie kart...");
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
-    // Zwiększamy liczbę przewinięć, żeby strona załadowała wszystkich 700+ petów
-    console.log("Przewijanie strony, aby załadować wszystkie zwierzaki...");
-    for (let i = 0; i < 40; i++) {
-      await page.evaluate(() => window.scrollBy(0, 1000));
-      await page.waitForTimeout(800);
-    }
+    let allPets = {};
 
-    console.log("Wyciąganie danych o petach...");
-    const petsData = await page.evaluate(() => {
-      let data = {};
-      const cards = document.querySelectorAll('div');
-      
-      cards.forEach(card => {
-        const h2 = card.querySelector('h2.font-bold');
-        if (h2) {
-          let name = h2.innerText.trim();
-          let cardText = card.innerText;
-          
-          let match = cardText.match(/Value\s*([\d,.]+)/i);
-          if (match) {
-            let priceStr = match[1].replace(/,/g, '');
-            let price = parseFloat(priceStr);
-            if (!isNaN(price) && name) {
-              data[name] = price;
+    // Przewijamy i zbieramy dane na bieżąco w każdym kroku, żeby nie stracić uciekających elementów z DOM
+    console.log("Przewijanie i zbieranie zwierzaków...");
+    for (let i = 0; i < 50; i++) {
+      const currentBatch = await page.evaluate(() => {
+        let data = {};
+        const cards = document.querySelectorAll('div');
+        
+        cards.forEach(card => {
+          const h2 = card.querySelector('h2.font-bold');
+          if (h2) {
+            let name = h2.innerText.trim();
+            let cardText = card.innerText;
+            
+            let match = cardText.match(/Value\s*([\d,.]+)/i);
+            if (match) {
+              let priceStr = match[1].replace(/,/g, '');
+              let price = parseFloat(priceStr);
+              if (!isNaN(price) && name) {
+                data[name] = price;
+              }
             }
           }
-        }
+        });
+        return data;
       });
+
+      // Łączymy nowe wyniki z ogólną pulą
+      Object.assign(allPets, currentBatch);
       
-      return data;
-    });
+      // Przewijamy niżej
+      await page.evaluate(() => window.scrollBy(0, 800));
+      await page.waitForTimeout(600);
+    }
 
-    console.log(`Znaleziono petów: ${Object.keys(petsData).length}`);
+    console.log(`Łącznie znaleziono unikalnych petów: ${Object.keys(allPets).length}`);
 
-    fs.writeFileSync('pets.json', JSON.stringify(petsData, null, 2));
+    fs.writeFileSync('pets.json', JSON.stringify(allPets, null, 2));
     console.log("Zapisano pomyślnie do pets.json!");
 
   } catch (error) {
