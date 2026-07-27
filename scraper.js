@@ -17,29 +17,12 @@ async function scrapePets() {
     console.log("Czekanie na załadowanie kart...");
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
-    // Wolniejsze i dokładniejsze przewijanie na sam dół (wielokrotne pętle)
+    // Agresywne przewijanie w dół kilkanaście razy, żeby zmusić stronę do załadowania wszystkiego
     console.log("Przewijanie strony, aby załadować wszystkie zwierzaki...");
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let totalHeight = 0;
-        let distance = 300;
-        let timer = setInterval(() => {
-          let scrollHeight = document.body.scrollHeight;
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-
-          // Przewijamy aż do końca i dajemy chwilę na doładowanie
-          if (totalHeight >= scrollHeight + 2000) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 200);
-      });
-    });
-
-    // Czekamy dodatkowe 5 sekund na ostateczne wyrenderowanie elementów przez JavaScript
-    console.log("Czekanie na ostateczne renderowanie...");
-    await page.waitForTimeout(5000);
+    for (let i = 0; i < 15; i++) {
+      await page.evaluate(() => window.scrollBy(0, 1000));
+      await page.waitForTimeout(1000);
+    }
 
     console.log("Wyciąganie danych o petach...");
     const petsData = await page.evaluate(() => {
