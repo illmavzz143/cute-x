@@ -15,36 +15,35 @@ async function scrapePets() {
     await page.goto('https://amvgg.com/values/pets', { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     console.log("Czekanie na załadowanie kart...");
-    // Czekamy aż pojawią się nagłówki z nazwami petów
     await page.waitForSelector('h2.font-bold', { timeout: 15000 }).catch(() => {});
 
-    // Przewijamy stronę do dołu, żeby załadować wszystkie elementy (infinite scroll / lazy load)
+    // Wolniejsze i dokładniejsze przewijanie na sam dół (wielokrotne pętle)
     console.log("Przewijanie strony, aby załadować wszystkie zwierzaki...");
     await page.evaluate(async () => {
       await new Promise((resolve) => {
         let totalHeight = 0;
-        let distance = 500;
+        let distance = 300;
         let timer = setInterval(() => {
           let scrollHeight = document.body.scrollHeight;
           window.scrollBy(0, distance);
           totalHeight += distance;
 
-          if (totalHeight >= scrollHeight - window.innerHeight) {
+          // Przewijamy aż do końca i dajemy chwilę na doładowanie
+          if (totalHeight >= scrollHeight + 2000) {
             clearInterval(timer);
             resolve();
           }
-        }, 100);
+        }, 200);
       });
     });
 
-    await page.waitForTimeout(2000);
+    // Czekamy dodatkowe 5 sekund na ostateczne wyrenderowanie elementów przez JavaScript
+    console.log("Czekanie na ostateczne renderowanie...");
+    await page.waitForTimeout(5000);
 
     console.log("Wyciąganie danych o petach...");
     const petsData = await page.evaluate(() => {
       let data = {};
-      
-      // Szukamy wszystkich kart zwierzaków na stronie
-      // Karta zazwyczaj zawiera tag h2 z nazwą
       const cards = document.querySelectorAll('div');
       
       cards.forEach(card => {
@@ -53,8 +52,6 @@ async function scrapePets() {
           let name = h2.innerText.trim();
           let cardText = card.innerText;
           
-          // Szukamy wartości (Value) w tekście karty
-          // Tekst zazwyczaj zawiera sekcję z wartością
           let match = cardText.match(/Value\s*([\d,.]+)/i);
           if (match) {
             let priceStr = match[1].replace(/,/g, '');
@@ -71,7 +68,6 @@ async function scrapePets() {
 
     console.log(`Znaleziono petów: ${Object.keys(petsData).length}`);
 
-    // Zapis do pliku JSON
     fs.writeFileSync('pets.json', JSON.stringify(petsData, null, 2));
     console.log("Zapisano pomyślnie do pets.json!");
 
